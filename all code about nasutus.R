@@ -1,7 +1,7 @@
 #Second check
 #nasutus
 setwd("D:/Gibbon/Sound/Data analyse/Second check/east")
-Zdata<-read.csv("Z_slim.csv")
+Zdata<-read.csv("Z_slim_add_boom.csv")
 #note count for each note type
 library(plyr)
 file <- count(Zdata$note_name)
