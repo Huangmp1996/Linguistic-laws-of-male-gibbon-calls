@@ -26,11 +26,12 @@ ggplot(data=file, aes(x=individual_ID,y=V1))+
   theme(panel.grid=element_blank(),axis.text= element_text(size=20),axis.title= element_text(size=25))
 #note count for each note type for each individual
 library(plyr)
+Zdata<-read.csv("Z_slim_add_boom.csv")
 file<- ddply(Zdata,.(individual_ID),function(x){count(x$note_name)
   }
   )
 library(ggplot2)
-ggplot(data=file, aes(x=x,y=freq))+
+ggplot(file, aes(x=x,y=freq))+
   geom_bar(stat = "identity",position=position_dodge(0.9),width = 0.5)+
   labs(y="Number of Notes",x = "Note Type")+
   facet_wrap(~individual_ID,scale="free")+
@@ -45,13 +46,19 @@ ggplot(data=file, aes(x=x,y=freq))+
 #boxplot of each note type
 Zdata1<-read.csv("Z_slim(add_boom_for_boxplot)CORRECTED.csv")
 library(ggplot2)
-ggplot(data=Zdata1, aes(x=note_name,y=note_duration))+
+library(plyr)
+file<- ddply(Zdata1,.(note_name),function(x){
+  mean(x$note_duration)
+  }
+)
+Zdata1$note_name = factor(Zdata1$note_name, levels=c('aa','mR0','boom','mR1','mR3','mR2','mR4','pre'))
+pA <- ggplot(data=Zdata1, aes(x=note_name,y=note_duration))+
   geom_boxplot()+
   labs(y="Duration (s)",x = "Note Type")+
   theme_bw()+
   theme(panel.grid=element_blank(),
         axis.title= element_text(size=27),
-        axis.text= element_text(size=23))
+        axis.text= element_text(size=23)) #R0G113B188
 Mseq_data<- read.csv("Mseq_slim.csv",header=T,sep=",")
 length(unique(Mseq_data$seqID))    #the number of sequences
 #seq count for each individual
@@ -91,12 +98,32 @@ for (i in group.name) {
 write.table(dat.sound,file = "Z_law_mean_add_boom.csv",
             row.names = F,sep = ",")
 #LMM Z model
+setwd("D:/Gibbon/Sound/Data analyse/Second check/east")
 library(lme4)
 library(lmerTest)
 Z.mean <- read.csv("Z_law_mean_add_boom.csv",stringsAsFactors = F)
 Z.mean$quantity <- as.numeric(Z.mean$quantity)
 z.model <- lmer(mean_duration~quantity+(1|individual_ID),data=Z.mean)
 summary(z.model)
+#Without aa
+library(lme4)
+library(lmerTest)
+setwd("D:/Gibbon/Sound/Data analyse/Second check/east")
+Z.mean <- read.csv("Z_law_mean_add_boom.csv",stringsAsFactors = F)
+Z.mean <- Z.mean[-which(Z.mean$note_name=="aa"),]
+Z.mean$quantity <- as.numeric(Z.mean$quantity)
+z.model <- lmer(mean_duration~quantity+(1|individual_ID),data=Z.mean)
+summary(z.model)
+#individually
+library(car)
+for (i in unique(Z.mean$individual_ID)) {
+  table <- subset(Z.mean,Z.mean$individual_ID==i)
+  model <- lm(mean_duration~quantity,data=table)
+  print(i)
+  print(outlierTest(model))
+  print(summary(model))
+}
+
 
 
 #linear plot of note mean ~ quantity
@@ -118,8 +145,10 @@ dat.sound$SD <- as.numeric(as.character(dat.sound$SD))
 str(dat.sound)
 #begin to plot 
 library(ggplot2)
-ggplot(dat.sound, aes(x=dat.sound$quantity, y=dat.sound$mean_duration))+
+summary(lm(dat.sound$mean_duration ~ dat.sound$quantity))
+pC <- ggplot(dat.sound, aes(x=dat.sound$quantity, y=dat.sound$mean_duration))+
   geom_point(size=3)+
+  stat_smooth(method = lm,se=FALSE)+
   geom_text(aes(y = mean_duration + .2, label = note_name),size=8)+
   geom_errorbar(aes(ymax=dat.sound$mean_duration+dat.sound$SD,ymin=dat.sound$mean_duration-dat.sound$SD),
                 position=position_dodge(0.9),width=0.80)+
@@ -127,7 +156,8 @@ ggplot(dat.sound, aes(x=dat.sound$quantity, y=dat.sound$mean_duration))+
   theme(panel.grid=element_blank(),
         axis.title= element_text(size=27),
         axis.text= element_text(size=23))+
-  labs(x="Frequency",y="Duration (s)")
+  labs(x="Number of each note type",y="Duration (s)")+
+  annotate('text',label="r^2 == 0.2274",parse=TRUE,x=7500,y=1.7,size=8)
 
 
 #linear plot of "delete pre" (dat.sound need second generation when run the next program twice)
@@ -216,9 +246,11 @@ file$seqsize <- as.numeric(as.character(file$seqsize))
 file$note_mean_duration <- as.numeric(as.character(file$note_mean_duration))
 file$SD <- as.numeric(as.character(file$SD))
 str(file)
+file$notename = factor(file$notename, levels=c('aa','mR0','boom','mR1','mR3','mR2','mR4','pre'))
 library(ggplot2)
-ggplot(file, aes(x=seqsize,y=note_mean_duration))+ 
+p1 <- ggplot(file, aes(x=seqsize,y=note_mean_duration))+ 
   geom_point(stat="identity")+facet_wrap(~notename,scales = "free")+
+  geom_smooth(method = lm,se=FALSE)+
   geom_errorbar(aes(ymax=note_mean_duration+SD,ymin=note_mean_duration-SD),
                 position=position_dodge(0.9),width=0.15)+
   labs(x="Sequence Size",y="Mean Duration of Notes (s)")+
@@ -230,6 +262,7 @@ ggplot(file, aes(x=seqsize,y=note_mean_duration))+
         axis.title= element_text(size=25),
         strip.text=element_text(size=rel(1.5)),
         strip.background = element_rect(fill = 'white', colour = 'black', size = rel(2), linetype = "blank"))
+p1
 
 #linear mixed model results
 Mseq_data<- read.csv("Mseq_slim.csv",header=T,sep=",",stringsAsFactors = F)
@@ -273,6 +306,7 @@ print(summary(A))
 
 
 #Proportion of a Particular Type ~ Sequence Size
+setwd("D:/Gibbon/Sound/Data analyse/Second check/east")
 Mseq_data<- read.csv("Mseq_slim.csv",header=T,sep=",",stringsAsFactors = F)
 file <- data.frame()
 seqsize.table <- as.character(unique(Mseq_data$seqsize))
@@ -293,7 +327,7 @@ for (i in seqsize.table) {
 
 file$proportion <- as.numeric(as.character(file$proportion))
 propt <- data.frame()
-
+file$notename = factor(file$notename, levels=c('aa','mR0','boom','mR1','mR3','mR2','mR4','pre'))
 notetype <- as.character(unique(Mseq_data$note_name))
 for (i in seqsize.table) {
   seq.table3 <- file[file$seqsize==i,]
@@ -311,9 +345,11 @@ propt$seqsize <- as.numeric(as.character(propt$seqsize))
 propt$proportion <- as.numeric(as.character(propt$proportion))
 propt$sd <- as.numeric(as.character(propt$sd))
 str(propt)
+propt$notename = factor(propt$notename, levels=c('aa','mR0','boom','mR1','mR3','mR2','mR4','pre'))
 library(ggplot2)
-ggplot(propt, aes(x=seqsize,y=proportion))+ 
+p3 <- ggplot(propt, aes(x=seqsize,y=proportion))+ 
   geom_point(stat="identity")+
+  geom_smooth(method = lm,se=FALSE)+
   geom_errorbar(aes(ymax=proportion+sd,ymin=proportion-sd),
                 position=position_dodge(0.9),width=0.15)+
   facet_wrap(~notename,scales = "free")+
